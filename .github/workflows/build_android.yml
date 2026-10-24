@@ -18,7 +18,6 @@ on:
 permissions:
   contents: write
 
-# Força todos os scripts e actions JavaScript a rodarem nativamente sob o Node 24
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
@@ -71,6 +70,9 @@ jobs:
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v4.6.1
+      with:
+        name: raylib-dev_android_api29_${{ matrix.ARCH }}
+        path: ./build/raylib-dev_android_api29_${{ matrix.ARCH }}
 
     - name: Upload Artifact to Release
       uses: softprops/action-gh-release@v2
