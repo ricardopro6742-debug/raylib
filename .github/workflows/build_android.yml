@@ -16,12 +16,10 @@ on:
     types: [published]
 
 permissions:
-  contents: read
+  contents: write # Permissão corrigida para permitir que o bot crie Releases se necessário
 
 jobs:
   build:
-    permissions:
-      contents: write  # Required for actions/upload-release-asset to upload release asset
     runs-on: windows-latest
     strategy:
       fail-fast: false
@@ -34,7 +32,7 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@master
+      uses: actions/checkout@v4
 
     - name: Setup Release Version
       run: |
@@ -47,52 +45,44 @@ jobs:
       uses: nttld/setup-ndk@v1
       with:
         ndk-version: r25
-        add-to-path: false
-      env:
-        ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+        add-to-path: true
 
     - name: Setup Environment
       run: |
-        mkdir build
-        cd build
-        mkdir ${{ env.RELEASE_NAME }}
-        cd ${{ env.RELEASE_NAME }}
-        mkdir include
-        mkdir lib
-        cd ../..
+        mkdir -p build/${{ env.RELEASE_NAME }}/include
+        mkdir -p build/${{ env.RELEASE_NAME }}/lib
+      shell: bash
 
-    # Generating static + shared library for 64bit arquitectures and API version 29
+    # Forçando o uso do Bash e passando o caminho do NDK extraído diretamente da saída do step anterior
     - name: Build Library
       run: |
         cd src
-        make PLATFORM=PLATFORM_ANDROID ANDROID_ARCH=${{ matrix.ARCH }} ANDROID_API_VERSION=29 ANDROID_NDK=${{ env.ANDROID_NDK_HOME }} RAYLIB_LIBTYPE=STATIC RAYLIB_RELEASE_PATH="../build/${{ env.RELEASE_NAME }}/lib"
-        make PLATFORM=PLATFORM_ANDROID ANDROID_ARCH=${{ matrix.ARCH }} ANDROID_API_VERSION=29 ANDROID_NDK=${{ env.ANDROID_NDK_HOME }} RAYLIB_LIBTYPE=SHARED RAYLIB_RELEASE_PATH="../build/${{ env.RELEASE_NAME }}/lib" -B
+        make PLATFORM=PLATFORM_ANDROID ANDROID_ARCH=${{ matrix.ARCH }} ANDROID_API_VERSION=29 ANDROID_NDK="${{ steps.setup-ndk.outputs.ndk-path }}" RAYLIB_LIBTYPE=STATIC RAYLIB_RELEASE_PATH="../build/${{ env.RELEASE_NAME }}/lib"
+        make PLATFORM=PLATFORM_ANDROID ANDROID_ARCH=${{ matrix.ARCH }} ANDROID_API_VERSION=29 ANDROID_NDK="${{ steps.setup-ndk.outputs.ndk-path }}" RAYLIB_LIBTYPE=SHARED RAYLIB_RELEASE_PATH="../build/${{ env.RELEASE_NAME }}/lib" -B
         cd ..
-      shell: cmd
+      shell: bash
 
+    # Usando Bash para garantir que os comandos cp e tar funcionem perfeitamente no ambiente virtual
     - name: Generate Artifacts
       run: |
-        cp -v ./src/raylib.h ./build/${{ env.RELEASE_NAME }}/include
-        cp -v ./src/raymath.h ./build/${{ env.RELEASE_NAME }}/include
-        cp -v ./src/rlgl.h ./build/${{ env.RELEASE_NAME }}/include
-        cp -v ./CHANGELOG ./build/${{ env.RELEASE_NAME }}/CHANGELOG
-        cp -v ./README.md ./build/${{ env.RELEASE_NAME }}/README.md
-        cp -v ./LICENSE ./build/${{ env.RELEASE_NAME }}/LICENSE
-        cd build
-        tar -czvf ${{ env.RELEASE_NAME }}.tar.gz ${{ env.RELEASE_NAME }}
+        cp -v ./src/raylib.h ./build/${{ env.RELEASE_NAME }}/include/
+        cp -v ./src/raymath.h ./build/${{ env.RELEASE_NAME }}/include/
+        cp -v ./src/rlgl.h ./build/${{ env.RELEASE_NAME }}/include/
+        cp -v ./CHANGELOG ./build/${{ env.RELEASE_NAME }}/ || true
+        cp -v ./README.md ./build/${{ env.RELEASE_NAME }}/ || true
+        cp -v ./LICENSE ./build/${{ env.RELEASE_NAME }}/ || true
+      shell: bash
 
     - name: Upload Artifacts
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ env.RELEASE_NAME }}
-        path: |
-          ./build/${{ env.RELEASE_NAME }}
-          !./build/${{ env.RELEASE_NAME }}.tar.gz
+        path: ./build/${{ env.RELEASE_NAME }}
 
     - name: Upload Artifact to Release
-      uses: softprops/action-gh-release@v3
+      uses: softprops/action-gh-release@v2
+      if: github.event_name == 'release' && github.event.action == 'published'
       with:
-        files: ./build/${{ env.RELEASE_NAME }}.tar.gz
+        files: ./build/${{ env.RELEASE_NAME }}/*
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      if: github.event_name == 'release' && github.event.action == 'published'
