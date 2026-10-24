@@ -16,7 +16,10 @@ on:
     types: [published]
 
 permissions:
-  contents: write # Permissão corrigida para permitir que o bot crie Releases se necessário
+  contents: write
+
+env:
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
 
 jobs:
   build:
@@ -27,62 +30,54 @@ jobs:
       matrix:
         ARCH: ["arm64", "x86_64"]
 
-    env:
-      RELEASE_NAME: raylib-dev_android_api29_${{ matrix.ARCH }}
-
     steps:
     - name: Checkout
       uses: actions/checkout@v4
-
-    - name: Setup Release Version
-      run: |
-        echo "RELEASE_NAME=raylib-${{ github.event.release.tag_name }}_android_api29_${{ matrix.ARCH }}" >> $GITHUB_ENV
-      shell: bash
-      if: github.event_name == 'release' && github.event.action == 'published'
 
     - name: Setup Android NDK
       id: setup-ndk
       uses: nttld/setup-ndk@v1
       with:
-        ndk-version: r25
+        ndk-version: r27d
         add-to-path: true
 
     - name: Setup Environment
       run: |
-        mkdir -p build/${{ env.RELEASE_NAME }}/include
-        mkdir -p build/${{ env.RELEASE_NAME }}/lib
+        RELEASE_NAME="raylib-dev_android_api29_${{ matrix.ARCH }}"
+        mkdir -p "build/${RELEASE_NAME}/include"
+        mkdir -p "build/${RELEASE_NAME}/lib"
       shell: bash
 
-    # Forçando o uso do Bash e passando o caminho do NDK extraído diretamente da saída do step anterior
     - name: Build Library
       run: |
+        RELEASE_NAME="raylib-dev_android_api29_${{ matrix.ARCH }}"
         cd src
-        make PLATFORM=PLATFORM_ANDROID ANDROID_ARCH=${{ matrix.ARCH }} ANDROID_API_VERSION=29 ANDROID_NDK="${{ steps.setup-ndk.outputs.ndk-path }}" RAYLIB_LIBTYPE=STATIC RAYLIB_RELEASE_PATH="../build/${{ env.RELEASE_NAME }}/lib"
-        make PLATFORM=PLATFORM_ANDROID ANDROID_ARCH=${{ matrix.ARCH }} ANDROID_API_VERSION=29 ANDROID_NDK="${{ steps.setup-ndk.outputs.ndk-path }}" RAYLIB_LIBTYPE=SHARED RAYLIB_RELEASE_PATH="../build/${{ env.RELEASE_NAME }}/lib" -B
+        make PLATFORM=PLATFORM_ANDROID ANDROID_ARCH=${{ matrix.ARCH }} ANDROID_API_VERSION=29 ANDROID_NDK="${{ steps.setup-ndk.outputs.ndk-path }}" RAYLIB_LIBTYPE=STATIC RAYLIB_RELEASE_PATH="../build/${RELEASE_NAME}/lib"
+        make PLATFORM=PLATFORM_ANDROID ANDROID_ARCH=${{ matrix.ARCH }} ANDROID_API_VERSION=29 ANDROID_NDK="${{ steps.setup-ndk.outputs.ndk-path }}" RAYLIB_LIBTYPE=SHARED RAYLIB_RELEASE_PATH="../build/${RELEASE_NAME}/lib" -B
         cd ..
       shell: bash
 
-    # Usando Bash para garantir que os comandos cp e tar funcionem perfeitamente no ambiente virtual
     - name: Generate Artifacts
       run: |
-        cp -v ./src/raylib.h ./build/${{ env.RELEASE_NAME }}/include/
-        cp -v ./src/raymath.h ./build/${{ env.RELEASE_NAME }}/include/
-        cp -v ./src/rlgl.h ./build/${{ env.RELEASE_NAME }}/include/
-        cp -v ./CHANGELOG ./build/${{ env.RELEASE_NAME }}/ || true
-        cp -v ./README.md ./build/${{ env.RELEASE_NAME }}/ || true
-        cp -v ./LICENSE ./build/${{ env.RELEASE_NAME }}/ || true
+        RELEASE_NAME="raylib-dev_android_api29_${{ matrix.ARCH }}"
+        cp -v ./src/raylib.h ./build/${RELEASE_NAME}/include/
+        cp -v ./src/raymath.h ./build/${RELEASE_NAME}/include/
+        cp -v ./src/rlgl.h ./build/${RELEASE_NAME}/include/
+        cp -v ./CHANGELOG ./build/${RELEASE_NAME}/ || true
+        cp -v ./README.md ./build/${RELEASE_NAME}/ || true
+        cp -v ./LICENSE ./build/${RELEASE_NAME}/ || true
       shell: bash
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ env.RELEASE_NAME }}
-        path: ./build/${{ env.RELEASE_NAME }}
+        name: raylib-dev_android_api29_${{ matrix.ARCH }}
+        path: ./build/raylib-dev_android_api29_${{ matrix.ARCH }}
 
     - name: Upload Artifact to Release
       uses: softprops/action-gh-release@v2
       if: github.event_name == 'release' && github.event.action == 'published'
       with:
-        files: ./build/${{ env.RELEASE_NAME }}/*
+        files: ./build/raylib-dev_android_api29_${{ matrix.ARCH }}/*
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
