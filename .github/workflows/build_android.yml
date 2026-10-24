@@ -18,9 +18,6 @@ on:
 permissions:
   contents: write
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-
 jobs:
   build:
     runs-on: windows-latest
@@ -32,7 +29,7 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v4.2.2
+      uses: actions/checkout@v4 # O GitHub resolve automaticamente para a revisão mais nova com Node 24
 
     - name: Setup Android NDK
       id: setup-ndk
@@ -69,7 +66,7 @@ jobs:
       shell: bash
 
     - name: Upload Artifacts
-      uses: actions/upload-artifact@v4.6.1
+      uses: actions/upload-artifact@v4 # O GitHub resolve automaticamente para a revisão mais nova com Node 24
       with:
         name: raylib-dev_android_api29_${{ matrix.ARCH }}
         path: ./build/raylib-dev_android_api29_${{ matrix.ARCH }}
